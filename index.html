@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Memory Grid Pattern Game</title>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --card-bg: #1e293b;
+            --accent: #38bdf8;
+            --tile-bg: #334155;
+            --tile-active: #7dd3fc;
+            --tile-success: #4ade80;
+            --tile-wrong: #f87171;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            touch-action: manipulation;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: #f8fafc;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            overflow: hidden;
+            padding: 10px;
+        }
+
+        .game-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+            max-width: 450px;
+            background: var(--card-bg);
+            padding: 20px;
+            border-radius: 16px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 15px;
+            width: 100%;
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            color: var(--accent);
+            margin-bottom: 5px;
+        }
+
+        .stats {
+            display: flex;
+            justify-content: space-around;
+            width: 100%;
+            font-size: 0.95rem;
+            color: #94a3b8;
+            margin-bottom: 15px;
+        }
+
+        .stats span {
+            color: #f1f5f9;
+            font-weight: bold;
+        }
+
+        #message {
+            font-size: 1rem;
+            height: 1.5rem;
+            margin-bottom: 10px;
+            font-weight: 600;
+            color: #fbbf24;
+            text-align: center;
+        }
+
+        /* Dynamic Grid Container */
+        #grid {
+            display: grid;
+            gap: 6px;
+            width: 100%;
+            aspect-ratio: 1 / 1;
+            margin-bottom: 20px;
+        }
+
+        .tile {
+            background-color: var(--tile-bg);
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background-color 0.2s, transform 0.1s;
+        }
+
+        .tile:active {
+            transform: scale(0.95);
+        }
+
+        .tile.active {
+            background-color: var(--tile-active);
+            box-shadow: 0 0 12px var(--tile-active);
+        }
+
+        .tile.success {
+            background-color: var(--tile-success);
+        }
+
+        .tile.wrong {
+            background-color: var(--tile-wrong);
+        }
+
+        #start-btn {
+            background-color: var(--accent);
+            color: #0f172a;
+            border: none;
+            padding: 12px 24px;
+            font-size: 1rem;
+            font-weight: bold;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: opacity 0.2s;
+            width: 100%;
+        }
+
+        #start-btn:active {
+            opacity: 0.8;
+        }
+
+        #start-btn:disabled {
+            background-color: #475569;
+            color: #94a3b8;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="game-container">
+        <header>
+            <h1>Pattern Memory</h1>
+            <div class="stats">
+                <div>Level: <span id="level">1</span>/10</div>
+                <div>Grid: <span id="grid-size-label">6x6</span></div>
+                <div>Score: <span id="score">0</span></div>
+            </div>
+        </header>
+
+        <div id="message">Press Start to Play</div>
+
+        <div id="grid"></div>
+
+        <button id="start-btn" onclick="startGame()">Start Game</button>
+    </div>
+
+    <script>
+        const gridElement = document.getElementById('grid');
+        const startBtn = document.getElementById('start-btn');
+        const levelElement = document.getElementById('level');
+        const scoreElement = document.getElementById('score');
+        const gridSizeLabel = document.getElementById('grid-size-label');
+        const messageElement = document.getElementById('message');
+
+        const MAX_LEVELS = 10;
+        let level = 1;
+        let score = 0;
+        let currentGridSize = 6; // Locked at 6x6
+        let sequence = [];
+        let playerSequence = [];
+        let isPlayingSequence = false;
+        let tiles = [];
+
+        function createGrid(size) {
+            gridElement.innerHTML = '';
+            gridElement.style.gridTemplateColumns = `repeat(${size}, 1fr)`;
+            gridElement.style.gridTemplateRows = `repeat(${size}, 1fr)`;
+            tiles = [];
+
+            const totalTiles = size * size;
+            for (let i = 0; i < totalTiles; i++) {
+                const tile = document.createElement('div');
+                tile.classList.add('tile');
+                tile.dataset.index = i;
+                tile.addEventListener('click', () => handleTileClick(i));
+                gridElement.appendChild(tile);
+                tiles.push(tile);
+            }
+        }
+
+        function startGame() {
+            level = 1;
+            score = 0;
+            sequence = [];
+            updateStats();
+            startBtn.disabled = true;
+            nextLevel();
+        }
+
+        function updateStats() {
+            levelElement.textContent = level;
+            scoreElement.textContent = score;
+            gridSizeLabel.textContent = `6x6`;
+        }
+
+        function nextLevel() {
+            playerSequence = [];
+            updateStats();
+            createGrid(currentGridSize);
+            
+            messageElement.textContent = `Level ${level}: Memorize the pattern`;
+            
+            // Add items to sequence
+            const totalTiles = currentGridSize * currentGridSize;
+            const randomTile = Math.floor(Math.random() * totalTiles);
+            sequence.push(randomTile);
+
+            playSequence();
+        }
+
+        function playSequence() {
+            isPlayingSequence = true;
+            let i = 0;
+            const speed = Math.max(300, 700 - (level * 25)); // Speeds up slightly as levels increase
+
+            const interval = setInterval(() => {
+                if (i > 0) {
+                    tiles[sequence[i - 1]].classList.remove('active');
+                }
+                
+                if (i < sequence.length) {
+                    tiles[sequence[i]].classList.add('active');
+                    setTimeout(() => {
+                        tiles[sequence[i]].classList.remove('active');
+                    }, speed / 2);
+                    i++;
+                } else {
+                    clearInterval(interval);
+                    isPlayingSequence = false;
+                    messageElement.textContent = "Your turn!";
+                }
+            }, speed);
+        }
+
+        function handleTileClick(index) {
+            if (isPlayingSequence || startBtn.disabled === false && sequence.length === 0) return;
+
+            playerSequence.push(index);
+            const currentIndex = playerSequence.length - 1;
+
+            // Check if user input matches current step
+            if (playerSequence[currentIndex] !== sequence[currentIndex]) {
+                // Wrong move
+                tiles[index].classList.add('wrong');
+                messageElement.style.color = '#f87171'; // Red text for losing
+                messageElement.textContent = "Game Over! Wrong Tile.";
+                endGame();
+                return;
+            }
+
+            // Flash correct selection feedback
+            tiles[index].classList.add('success');
+            setTimeout(() => tiles[index].classList.remove('success'), 200);
+
+            // Check if sequence completed successfully
+            if (playerSequence.length === sequence.length) {
+                score += level * 10;
+                
+                // Win Condition
+                if (level === MAX_LEVELS) {
+                    updateStats();
+                    messageElement.style.color = '#4ade80'; // Green text for winning
+                    messageElement.textContent = "Congratulations! You beat all 10 levels!";
+                    endGame();
+                    return;
+                }
+
+                level++;
+                messageElement.style.color = '#fbbf24'; // Revert to yellow
+                messageElement.textContent = "Correct! Next level...";
+                setTimeout(nextLevel, 1200);
+            }
+        }
+
+        function endGame() {
+            startBtn.disabled = false;
+            startBtn.textContent = "Play Again";
+            isPlayingSequence = true; // Block further clicks
+        }
+        
+        // Initialize an empty grid on load
+        createGrid(currentGridSize);
+    </script>
+</body>
+</html>
